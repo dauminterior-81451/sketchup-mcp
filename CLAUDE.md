@@ -62,11 +62,25 @@ Extensions > Daum MCP Bridge > Reload Plugin
 - `sketchup_export_top_view`
 - `sketchup_export_current_view`
 - `sketchup_bounds_debug`
+- `sketchup_create_box`
+- `sketchup_create_wall`
+- `sketchup_move_selection`
+- `sketchup_rotate_selection`
+- `sketchup_hide_selection`
+- `sketchup_show_all`
+- `sketchup_capture_work_context`
+
+## Automation Modes
+
+- View mode: show current view, practical top view, selection-focused view.
+- Memory mode: save reusable context to `work-memory/model-memory.json` and `work-memory/latest-report.md`.
+- Modeling mode: create simple groups such as boxes and walls; move, rotate, hide, and unhide selected entities.
 
 ## Important Notes
 
 - Preserve UTF-8 response handling. Korean model names and file paths must not break.
 - When the user asks to show a "top view", use a practical working-view scale close to the user's current SketchUp composition, not a full model-bounds fit.
+- Prefer safe, undoable SketchUp operations. Avoid destructive commands unless the user clearly confirms.
 - Current bridge response header must include:
 
 ```text

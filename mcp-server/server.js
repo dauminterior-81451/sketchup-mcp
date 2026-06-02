@@ -1,4 +1,6 @@
 const http = require("node:http");
+const fs = require("node:fs");
+const path = require("node:path");
 
 const bridgeUrl = process.env.SKETCHUP_BRIDGE_URL || "http://127.0.0.1:8765";
 
@@ -66,6 +68,84 @@ const tools = [
   {
     name: "sketchup_bounds_debug",
     description: "List largest visible top-level SketchUp entity bounds for export framing diagnosis.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false }
+  },
+  {
+    name: "sketchup_create_box",
+    description: "Create a named box group in SketchUp using millimeter dimensions.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        width: { type: "number", minimum: 1 },
+        depth: { type: "number", minimum: 1 },
+        height: { type: "number", minimum: 1 },
+        x: { type: "number" },
+        y: { type: "number" },
+        z: { type: "number" }
+      },
+      required: ["width", "depth", "height"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "sketchup_create_wall",
+    description: "Create a wall group from two plan points, thickness, and height in millimeters.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        x1: { type: "number" },
+        y1: { type: "number" },
+        x2: { type: "number" },
+        y2: { type: "number" },
+        thickness: { type: "number", minimum: 1 },
+        height: { type: "number", minimum: 1 },
+        z: { type: "number" }
+      },
+      required: ["x1", "y1", "x2", "y2", "thickness", "height"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "sketchup_move_selection",
+    description: "Move selected SketchUp entities by millimeter offsets.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        dx: { type: "number" },
+        dy: { type: "number" },
+        dz: { type: "number" }
+      },
+      additionalProperties: false
+    }
+  },
+  {
+    name: "sketchup_rotate_selection",
+    description: "Rotate selected SketchUp entities around their center.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        axis: { type: "string", enum: ["x", "y", "z"] },
+        angleDegrees: { type: "number" }
+      },
+      required: ["axis", "angleDegrees"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "sketchup_hide_selection",
+    description: "Hide selected SketchUp entities.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false }
+  },
+  {
+    name: "sketchup_show_all",
+    description: "Unhide all top-level SketchUp model entities.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false }
+  },
+  {
+    name: "sketchup_capture_work_context",
+    description: "Save current SketchUp model context memory and a practical work report.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false }
   }
 ];
@@ -140,7 +220,58 @@ async function callTool(name, args) {
     });
   }
   if (name === "sketchup_bounds_debug") return requestBridge("GET", "/bounds_debug");
+  if (name === "sketchup_create_box") return requestBridge("POST", "/create_box", args);
+  if (name === "sketchup_create_wall") return requestBridge("POST", "/create_wall", args);
+  if (name === "sketchup_move_selection") return requestBridge("POST", "/move_selection", args);
+  if (name === "sketchup_rotate_selection") return requestBridge("POST", "/rotate_selection", args);
+  if (name === "sketchup_hide_selection") return requestBridge("POST", "/hide_selection", {});
+  if (name === "sketchup_show_all") return requestBridge("POST", "/show_all", {});
+  if (name === "sketchup_capture_work_context") return captureWorkContext();
   throw new Error(`Unknown tool: ${name}`);
+}
+
+async function captureWorkContext() {
+  const [status, model, selection, bounds] = await Promise.all([
+    requestBridge("GET", "/status"),
+    requestBridge("GET", "/model_summary"),
+    requestBridge("GET", "/selection"),
+    requestBridge("GET", "/bounds_debug")
+  ]);
+  const capturedAt = new Date().toISOString();
+  const repoRoot = path.resolve(__dirname, "..");
+  const memoryDir = path.join(repoRoot, "work-memory");
+  fs.mkdirSync(memoryDir, { recursive: true });
+
+  const memory = { capturedAt, status, model, selection, bounds };
+  const memoryPath = path.join(memoryDir, "model-memory.json");
+  fs.writeFileSync(memoryPath, JSON.stringify(memory, null, 2), "utf8");
+
+  const largest = bounds.items?.[0];
+  const report = [
+    "# SketchUp Work Report",
+    "",
+    `- Captured: ${capturedAt}`,
+    `- Model: ${model.title || "(untitled)"}`,
+    `- Path: ${model.path || "(unsaved)"}`,
+    `- Units: ${model.units}`,
+    `- Entities: ${model.entities_count}`,
+    `- Groups: ${model.groups_count}`,
+    `- Components: ${model.component_instances_count}`,
+    `- Materials: ${model.materials_count}`,
+    `- Tags: ${model.tags_count}`,
+    `- Selection count: ${selection.count}`,
+    largest ? `- Largest visible entity: ${largest.type} ${largest.name || ""} / ${largest.diagonal_mm}mm` : "- Largest visible entity: none",
+    "",
+    "## Next Checks",
+    "",
+    "- Check far-away visible entities if top view framing is too small.",
+    "- Use current-view export when the user's manual camera composition is preferred.",
+    "- Use selection tools before direct modeling commands."
+  ].join("\n");
+  const reportPath = path.join(memoryDir, "latest-report.md");
+  fs.writeFileSync(reportPath, report, "utf8");
+
+  return { memoryPath, reportPath, capturedAt, modelTitle: model.title };
 }
 
 function jsonRpc(id, result) {

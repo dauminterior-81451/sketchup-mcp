@@ -53,6 +53,20 @@ C:\Users\User\.codex\config.toml
 - `sketchup_export_top_view`
 - `sketchup_export_current_view`
 - `sketchup_bounds_debug`
+- `sketchup_create_box`
+- `sketchup_create_wall`
+- `sketchup_move_selection`
+- `sketchup_rotate_selection`
+- `sketchup_hide_selection`
+- `sketchup_show_all`
+- `sketchup_capture_work_context`
+
+## Current Automation Modes
+
+- View mode: export current SketchUp view, export practical top view, debug framing bounds.
+- Memory mode: save model context and latest work report under `work-memory/`.
+- Modeling mode: create basic box/wall groups and move/rotate/hide selected entities.
+- Avoid destructive modeling commands unless the user explicitly asks and confirms.
 
 ## SketchUp Menu
 
@@ -72,6 +86,8 @@ Extensions > Daum MCP Bridge > Reload Plugin
 - Keep Ruby plugin compatible with SketchUp 2023.
 - Preserve UTF-8 JSON responses for Korean model names and paths.
 - When the user asks to show a "top view", frame it close to the user's current working view scale instead of fitting the entire model bounds.
+- When adding modeling automation, prefer safe reversible operations using `model.start_operation`.
+- Do not test modeling commands on the user's active model unless the user asks for that exact change.
 - Run `npm run check` after editing `mcp-server/server.js`.
 - If editing the Ruby plugin, copy it to the SketchUp Plugins folder and verify through `/ping`, `/status`, and `/model_summary`.
 

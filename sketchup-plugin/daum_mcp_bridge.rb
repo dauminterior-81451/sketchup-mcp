@@ -164,6 +164,12 @@ module DaumInterior
         return rename_selection(body['name'].to_s) if method == 'POST' && path == '/rename_selection'
         return export_top_view(body) if method == 'POST' && path == '/export_top_view'
         return export_current_view(body) if method == 'POST' && path == '/export_current_view'
+        return create_box(body) if method == 'POST' && path == '/create_box'
+        return create_wall(body) if method == 'POST' && path == '/create_wall'
+        return move_selection(body) if method == 'POST' && path == '/move_selection'
+        return rotate_selection(body) if method == 'POST' && path == '/rotate_selection'
+        return hide_selection if method == 'POST' && path == '/hide_selection'
+        return show_all if method == 'POST' && path == '/show_all'
 
         raise "Unknown endpoint: #{method} #{path}"
       end
@@ -290,6 +296,164 @@ module DaumInterior
         }
       end
 
+      def create_box(body)
+        width = required_mm(body, 'width')
+        depth = required_mm(body, 'depth')
+        height = required_mm(body, 'height')
+        origin = point_from_body(body)
+        name = body['name'].to_s.strip
+        name = 'MCP Box' if name.empty?
+
+        model = Sketchup.active_model
+        model.start_operation("Create #{name}", true)
+        group = model.active_entities.add_group
+        entities = group.entities
+        pts = [
+          origin,
+          Geom::Point3d.new(origin.x + width, origin.y, origin.z),
+          Geom::Point3d.new(origin.x + width, origin.y + depth, origin.z),
+          Geom::Point3d.new(origin.x, origin.y + depth, origin.z)
+        ]
+        face = entities.add_face(pts)
+        face.reverse! if face.normal.z < 0
+        face.pushpull(height)
+        group.name = name
+        model.commit_operation
+
+        {
+          created: true,
+          type: 'Group',
+          name: group.name,
+          bounds_mm: bounds_summary(group.bounds)
+        }
+      rescue StandardError
+        Sketchup.active_model.abort_operation
+        raise
+      end
+
+      def create_wall(body)
+        x1 = required_number(body, 'x1').mm
+        y1 = required_number(body, 'y1').mm
+        x2 = required_number(body, 'x2').mm
+        y2 = required_number(body, 'y2').mm
+        thickness = required_mm(body, 'thickness')
+        height = required_mm(body, 'height')
+        z = number_or_default(body, 'z', 0).mm
+        name = body['name'].to_s.strip
+        name = 'MCP Wall' if name.empty?
+
+        start_pt = Geom::Point3d.new(x1, y1, z)
+        end_pt = Geom::Point3d.new(x2, y2, z)
+        direction = end_pt - start_pt
+        raise 'Wall length must be greater than 0.' unless direction.length.positive?
+
+        normal = Geom::Vector3d.new(-direction.y, direction.x, 0)
+        normal.length = thickness / 2.0
+        normal_reverse = Geom::Vector3d.new(-normal.x, -normal.y, -normal.z)
+        pts = [
+          start_pt.offset(normal),
+          end_pt.offset(normal),
+          end_pt.offset(normal_reverse),
+          start_pt.offset(normal_reverse)
+        ]
+
+        model = Sketchup.active_model
+        model.start_operation("Create #{name}", true)
+        group = model.active_entities.add_group
+        face = group.entities.add_face(pts)
+        face.reverse! if face.normal.z < 0
+        face.pushpull(height)
+        group.name = name
+        model.commit_operation
+
+        {
+          created: true,
+          type: 'Group',
+          name: group.name,
+          length_mm: direction.length.to_mm.round(2),
+          bounds_mm: bounds_summary(group.bounds)
+        }
+      rescue StandardError
+        Sketchup.active_model.abort_operation
+        raise
+      end
+
+      def move_selection(body)
+        dx = number_or_default(body, 'dx', 0).mm
+        dy = number_or_default(body, 'dy', 0).mm
+        dz = number_or_default(body, 'dz', 0).mm
+        model = Sketchup.active_model
+        selection = model.selection.to_a
+        raise 'No selected entities.' if selection.empty?
+
+        model.start_operation('Move Selection', true)
+        transform = Geom::Transformation.translation(Geom::Vector3d.new(dx, dy, dz))
+        model.active_entities.transform_entities(transform, selection)
+        model.commit_operation
+
+        { moved: selection.length, dx_mm: dx.to_mm, dy_mm: dy.to_mm, dz_mm: dz.to_mm }
+      rescue StandardError
+        Sketchup.active_model.abort_operation
+        raise
+      end
+
+      def rotate_selection(body)
+        axis = body['axis'].to_s.downcase
+        angle_degrees = required_number(body, 'angleDegrees')
+        vector = {
+          'x' => Geom::Vector3d.new(1, 0, 0),
+          'y' => Geom::Vector3d.new(0, 1, 0),
+          'z' => Geom::Vector3d.new(0, 0, 1)
+        }[axis]
+        raise 'axis must be x, y, or z.' unless vector
+
+        model = Sketchup.active_model
+        selection = model.selection.to_a
+        raise 'No selected entities.' if selection.empty?
+
+        bounds = Geom::BoundingBox.new
+        selection.each { |entity| bounds.add(entity.bounds) if entity.respond_to?(:bounds) }
+        model.start_operation('Rotate Selection', true)
+        transform = Geom::Transformation.rotation(bounds.center, vector, angle_degrees.degrees)
+        model.active_entities.transform_entities(transform, selection)
+        model.commit_operation
+
+        { rotated: selection.length, axis: axis, angle_degrees: angle_degrees }
+      rescue StandardError
+        Sketchup.active_model.abort_operation
+        raise
+      end
+
+      def hide_selection
+        model = Sketchup.active_model
+        selection = model.selection.to_a
+        raise 'No selected entities.' if selection.empty?
+
+        model.start_operation('Hide Selection', true)
+        selection.each { |entity| entity.hidden = true if entity.respond_to?(:hidden=) }
+        model.commit_operation
+        { hidden: selection.length }
+      rescue StandardError
+        Sketchup.active_model.abort_operation
+        raise
+      end
+
+      def show_all
+        model = Sketchup.active_model
+        changed = 0
+        model.start_operation('Show All Top-Level Entities', true)
+        model.entities.each do |entity|
+          next unless entity.respond_to?(:hidden=) && entity.hidden?
+          entity.hidden = false
+          changed += 1
+        end
+        model.commit_operation
+        { shown: changed }
+      rescue StandardError
+        Sketchup.active_model.abort_operation
+        raise
+      end
+
       def entity_summary(entity)
         bounds = entity.respond_to?(:bounds) ? entity.bounds : nil
         {
@@ -364,6 +528,37 @@ module DaumInterior
       def positive_float(value, fallback)
         float = value.to_f
         float.positive? ? float : fallback
+      end
+
+      def point_from_body(body)
+        Geom::Point3d.new(
+          number_or_default(body, 'x', 0).mm,
+          number_or_default(body, 'y', 0).mm,
+          number_or_default(body, 'z', 0).mm
+        )
+      end
+
+      def required_mm(body, key)
+        required_positive_number(body, key).mm
+      end
+
+      def required_number(body, key)
+        value = body[key]
+        raise "#{key} is required." if value.nil?
+
+        value.to_f
+      end
+
+      def required_positive_number(body, key)
+        number = required_number(body, key)
+        raise "#{key} must be greater than 0." if number <= 0
+
+        number
+      end
+
+      def number_or_default(body, key, fallback)
+        value = body[key]
+        value.nil? ? fallback : value.to_f
       end
 
       def length_unit_name(model)
