@@ -30,6 +30,10 @@ docs/INSTALL.md
 - `sketchup_hide_selection`
 - `sketchup_show_all`
 - `sketchup_capture_work_context`
+- `sketchup_save_current_view`
+- `sketchup_create_scene`
+- `sketchup_auto_name_selection`
+- `sketchup_backup_model`
 
 ## First automation modes
 
@@ -37,6 +41,7 @@ docs/INSTALL.md
 - Memory mode: capture model summary, selection, and work report to `work-memory/`.
 - Modeling mode: create basic boxes/walls and move/rotate/hide selected objects.
 - Review mode: analyze selected entities and find cleanup targets.
+- Safety mode: backup the model, save working scenes, and log assistant actions.
 
 ## SketchUp menu
 

@@ -179,6 +179,48 @@ const tools = [
     name: "sketchup_capture_work_context",
     description: "Save current SketchUp model context memory and a practical work report.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false }
+  },
+  {
+    name: "sketchup_save_current_view",
+    description: "Save the current SketchUp camera composition as a scene/page.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", minLength: 1 }
+      },
+      required: ["name"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "sketchup_create_scene",
+    description: "Create a named SketchUp scene from the current view.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", minLength: 1 }
+      },
+      required: ["name"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "sketchup_auto_name_selection",
+    description: "Automatically name selected groups or component instances with a prefix.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        prefix: { type: "string", minLength: 1 },
+        overwrite: { type: "boolean" }
+      },
+      required: ["prefix"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "sketchup_backup_model",
+    description: "Save a timestamped backup copy of the current SketchUp model.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false }
   }
 ];
 
@@ -274,6 +316,10 @@ async function callTool(name, args) {
   if (name === "sketchup_hide_selection") return requestBridge("POST", "/hide_selection", {});
   if (name === "sketchup_show_all") return requestBridge("POST", "/show_all", {});
   if (name === "sketchup_capture_work_context") return captureWorkContext();
+  if (name === "sketchup_save_current_view") return requestBridge("POST", "/save_current_view", args);
+  if (name === "sketchup_create_scene") return requestBridge("POST", "/create_scene", args);
+  if (name === "sketchup_auto_name_selection") return requestBridge("POST", "/auto_name_selection", args);
+  if (name === "sketchup_backup_model") return requestBridge("POST", "/backup_model", {});
   throw new Error(`Unknown tool: ${name}`);
 }
 

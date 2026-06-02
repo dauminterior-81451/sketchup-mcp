@@ -72,6 +72,10 @@ Extensions > Daum MCP Bridge > Reload Plugin
 - `sketchup_hide_selection`
 - `sketchup_show_all`
 - `sketchup_capture_work_context`
+- `sketchup_save_current_view`
+- `sketchup_create_scene`
+- `sketchup_auto_name_selection`
+- `sketchup_backup_model`
 
 ## Automation Modes
 
@@ -79,12 +83,14 @@ Extensions > Daum MCP Bridge > Reload Plugin
 - Memory mode: save reusable context to `work-memory/model-memory.json` and `work-memory/latest-report.md`.
 - Modeling mode: create simple groups such as boxes and walls; move, rotate, hide, and unhide selected entities.
 - Review mode: analyze selection details, find cleanup targets, and export selected objects for inspection.
+- Safety mode: create `.skp` backups, save working scenes, auto-name selected objects, and log actions.
 
 ## Important Notes
 
 - Preserve UTF-8 response handling. Korean model names and file paths must not break.
 - When the user asks to show a "top view", use a practical working-view scale close to the user's current SketchUp composition, not a full model-bounds fit.
 - Prefer safe, undoable SketchUp operations. Avoid destructive commands unless the user clearly confirms.
+- Before large modeling work, save a scene and create a backup first.
 - Current bridge response header must include:
 
 ```text

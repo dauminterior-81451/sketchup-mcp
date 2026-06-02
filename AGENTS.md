@@ -63,6 +63,10 @@ C:\Users\User\.codex\config.toml
 - `sketchup_hide_selection`
 - `sketchup_show_all`
 - `sketchup_capture_work_context`
+- `sketchup_save_current_view`
+- `sketchup_create_scene`
+- `sketchup_auto_name_selection`
+- `sketchup_backup_model`
 
 ## Current Automation Modes
 
@@ -70,6 +74,7 @@ C:\Users\User\.codex\config.toml
 - Memory mode: save model context and latest work report under `work-memory/`.
 - Modeling mode: create basic box/wall groups and move/rotate/hide selected entities.
 - Review mode: inspect selected objects, export selected objects, and find cleanup targets before modeling.
+- Safety mode: create backups, save scenes, auto-name selected objects, and log assistant actions.
 - Avoid destructive modeling commands unless the user explicitly asks and confirms.
 
 ## SketchUp Menu
@@ -92,6 +97,7 @@ Extensions > Daum MCP Bridge > Reload Plugin
 - When the user asks to show a "top view", frame it close to the user's current working view scale instead of fitting the entire model bounds.
 - When adding modeling automation, prefer safe reversible operations using `model.start_operation`.
 - Do not test modeling commands on the user's active model unless the user asks for that exact change.
+- Before large modeling changes, prefer `sketchup_backup_model` and `sketchup_save_current_view`.
 - Run `npm run check` after editing `mcp-server/server.js`.
 - If editing the Ruby plugin, copy it to the SketchUp Plugins folder and verify through `/ping`, `/status`, and `/model_summary`.
 

@@ -1,6 +1,7 @@
 require 'json'
 require 'socket'
 require 'fileutils'
+require 'time'
 require 'sketchup.rb'
 
 module DaumInterior
@@ -173,6 +174,10 @@ module DaumInterior
         return rotate_selection(body) if method == 'POST' && path == '/rotate_selection'
         return hide_selection if method == 'POST' && path == '/hide_selection'
         return show_all if method == 'POST' && path == '/show_all'
+        return save_current_view(body) if method == 'POST' && path == '/save_current_view'
+        return create_scene(body) if method == 'POST' && path == '/create_scene'
+        return auto_name_selection(body) if method == 'POST' && path == '/auto_name_selection'
+        return backup_model if method == 'POST' && path == '/backup_model'
 
         raise "Unknown endpoint: #{method} #{path}"
       end
@@ -506,6 +511,78 @@ module DaumInterior
         raise
       end
 
+      def save_current_view(body)
+        create_scene(body)
+      end
+
+      def create_scene(body)
+        name = body['name'].to_s.strip
+        raise 'name is required.' if name.empty?
+
+        model = Sketchup.active_model
+        model.start_operation("Create Scene #{name}", true)
+        page = model.pages.add(name)
+        page.use_camera = true
+        page.camera = model.active_view.camera
+        page.use_rendering_options = true
+        page.use_shadow_info = true
+        model.pages.selected_page = page
+        model.commit_operation
+        log_action('create_scene', { name: name })
+
+        { created: true, name: page.name, pages_count: model.pages.length }
+      rescue StandardError
+        Sketchup.active_model.abort_operation
+        raise
+      end
+
+      def auto_name_selection(body)
+        prefix = body['prefix'].to_s.strip
+        raise 'prefix is required.' if prefix.empty?
+
+        overwrite = body['overwrite'] == true
+        model = Sketchup.active_model
+        selection = model.selection.to_a
+        raise 'No selected entities.' if selection.empty?
+
+        changed = []
+        model.start_operation('Auto Name Selection', true)
+        selection.each_with_index do |entity, index|
+          next unless entity.respond_to?(:name=)
+          next if !overwrite && entity.respond_to?(:name) && !entity.name.to_s.strip.empty?
+
+          new_name = "#{prefix}_#{format('%03d', index + 1)}"
+          entity.name = new_name
+          changed << { type: entity.typename, name: new_name }
+        end
+        model.commit_operation
+        log_action('auto_name_selection', { prefix: prefix, overwrite: overwrite, changed: changed.length })
+
+        { changed: changed.length, items: changed }
+      rescue StandardError
+        Sketchup.active_model.abort_operation
+        raise
+      end
+
+      def backup_model
+        model = Sketchup.active_model
+        raise 'Model must be saved before backup.' if model.path.to_s.strip.empty?
+
+        backup_dir = File.join(File.dirname(model.path), 'codex-backups')
+        FileUtils.mkdir_p(backup_dir)
+        base_name = File.basename(model.path, '.skp')
+        timestamp = Time.now.strftime('%Y%m%d-%H%M%S')
+        backup_path = File.join(backup_dir, "#{base_name}-#{timestamp}.skp")
+        model.save_copy(backup_path)
+        log_action('backup_model', { backup_path: backup_path })
+
+        {
+          created: true,
+          backup_path: backup_path,
+          model_path: model.path
+        }
+      end
+
       def entity_summary(entity)
         bounds = entity.respond_to?(:bounds) ? entity.bounds : nil
         {
@@ -724,6 +801,23 @@ module DaumInterior
           y: point.y.to_mm.round(2),
           z: point.z.to_mm.round(2)
         }
+      end
+
+      def log_action(action, payload)
+        model = Sketchup.active_model
+        base_dir = model.path.to_s.strip.empty? ? Dir.home : File.dirname(model.path)
+        log_dir = File.join(base_dir, 'codex-logs')
+        FileUtils.mkdir_p(log_dir)
+        log_path = File.join(log_dir, 'sketchup-mcp-actions.jsonl')
+        event = {
+          at: Time.now.iso8601,
+          action: action,
+          model_title: model.title,
+          model_path: model.path,
+          payload: payload
+        }
+        File.open(log_path, 'a:utf-8') { |file| file.puts(JSON.generate(event)) }
+        log_path
       end
 
       def positive_integer(value, fallback)
