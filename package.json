@@ -1,0 +1,12 @@
+{
+  "name": "sketchup-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local MCP bridge for SketchUp 2023 desktop assistance.",
+  "scripts": {
+    "check": "node --check mcp-server/server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
