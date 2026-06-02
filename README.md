@@ -18,6 +18,8 @@ docs/INSTALL.md
 - `sketchup_selection`
 - `sketchup_rename_selection`
 - `sketchup_export_top_view`
+- `sketchup_export_current_view`
+- `sketchup_bounds_debug`
 
 ## SketchUp menu
 

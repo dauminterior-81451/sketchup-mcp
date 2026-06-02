@@ -51,6 +51,8 @@ C:\Users\User\.codex\config.toml
 - `sketchup_selection`
 - `sketchup_rename_selection`
 - `sketchup_export_top_view`
+- `sketchup_export_current_view`
+- `sketchup_bounds_debug`
 
 ## SketchUp Menu
 
@@ -69,6 +71,7 @@ Extensions > Daum MCP Bridge > Reload Plugin
 - Do not hardcode user project model paths.
 - Keep Ruby plugin compatible with SketchUp 2023.
 - Preserve UTF-8 JSON responses for Korean model names and paths.
+- When the user asks to show a "top view", frame it close to the user's current working view scale instead of fitting the entire model bounds.
 - Run `npm run check` after editing `mcp-server/server.js`.
 - If editing the Ruby plugin, copy it to the SketchUp Plugins folder and verify through `/ping`, `/status`, and `/model_summary`.
 

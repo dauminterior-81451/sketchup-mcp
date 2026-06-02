@@ -160,8 +160,10 @@ module DaumInterior
         return bridge_status if method == 'GET' && path == '/status'
         return model_summary if method == 'GET' && path == '/model_summary'
         return selection_summary if method == 'GET' && path == '/selection'
+        return bounds_debug if method == 'GET' && path == '/bounds_debug'
         return rename_selection(body['name'].to_s) if method == 'POST' && path == '/rename_selection'
         return export_top_view(body) if method == 'POST' && path == '/export_top_view'
+        return export_current_view(body) if method == 'POST' && path == '/export_current_view'
 
         raise "Unknown endpoint: #{method} #{path}"
       end
@@ -222,20 +224,23 @@ module DaumInterior
 
         width = positive_integer(body['width'], 1600)
         height = positive_integer(body['height'], 1200)
+        margin = positive_float(body['margin'], 1.15)
         model = Sketchup.active_model
         view = model.active_view
-        bounds = model.bounds
+        bounds = visible_model_bounds(model)
         center = bounds.center
         distance = [bounds.width, bounds.depth, bounds.height, 1000.mm].max * 2
+        image_aspect = width.to_f / height.to_f
+        view_height = [bounds.depth, bounds.width / image_aspect].max * margin
 
         eye = Geom::Point3d.new(center.x, center.y, center.z + distance)
         target = Geom::Point3d.new(center.x, center.y, center.z)
         up = Geom::Vector3d.new(0, 1, 0)
         camera = Sketchup::Camera.new(eye, target, up)
         camera.perspective = false
+        camera.height = view_height
 
         view.camera = camera
-        view.zoom_extents
         view.refresh
 
         FileUtils.mkdir_p(File.dirname(output_path))
@@ -253,7 +258,35 @@ module DaumInterior
           output_path: output_path,
           width: width,
           height: height,
+          margin: margin,
           title: model.title
+        }
+      end
+
+      def export_current_view(body)
+        output_path = body['outputPath'].to_s
+        raise 'outputPath is required.' if output_path.strip.empty?
+
+        width = positive_integer(body['width'], 1600)
+        height = positive_integer(body['height'], 1200)
+        view = Sketchup.active_model.active_view
+
+        FileUtils.mkdir_p(File.dirname(output_path))
+        ok = view.write_image(
+          filename: output_path,
+          width: width,
+          height: height,
+          antialias: true,
+          compression: 0.9,
+          transparent: false
+        )
+        raise "Failed to write image: #{output_path}" unless ok
+
+        {
+          output_path: output_path,
+          width: width,
+          height: height,
+          title: Sketchup.active_model.title
         }
       end
 
@@ -267,6 +300,54 @@ module DaumInterior
         }
       end
 
+      def visible_model_bounds(model)
+        bounds = Geom::BoundingBox.new
+        model.entities.each do |entity|
+          next unless entity_visible?(entity)
+          next unless entity.respond_to?(:bounds)
+
+          bounds.add(entity.bounds)
+        end
+        raise 'No visible model entities found.' unless bounds.valid?
+
+        bounds
+      end
+
+      def bounds_debug
+        items = Sketchup.active_model.entities.to_a
+          .select { |entity| entity_visible?(entity) && entity.respond_to?(:bounds) }
+          .map { |entity| bounds_debug_item(entity) }
+          .sort_by { |item| -item[:diagonal_mm] }
+          .first(20)
+
+        { count: items.length, items: items }
+      end
+
+      def bounds_debug_item(entity)
+        bounds = entity.bounds
+        {
+          type: entity.typename,
+          name: entity.respond_to?(:name) ? entity.name.to_s : '',
+          layer: entity.respond_to?(:layer) && entity.layer ? entity.layer.name : '',
+          width_mm: bounds.width.to_mm.round(2),
+          depth_mm: bounds.depth.to_mm.round(2),
+          height_mm: bounds.height.to_mm.round(2),
+          center_mm: {
+            x: bounds.center.x.to_mm.round(2),
+            y: bounds.center.y.to_mm.round(2),
+            z: bounds.center.z.to_mm.round(2)
+          },
+          diagonal_mm: Math.sqrt(bounds.width.to_mm**2 + bounds.depth.to_mm**2 + bounds.height.to_mm**2).round(2)
+        }
+      end
+
+      def entity_visible?(entity)
+        return false if entity.respond_to?(:hidden?) && entity.hidden?
+        return false if entity.respond_to?(:layer) && entity.layer && !entity.layer.visible?
+
+        true
+      end
+
       def bounds_summary(bounds)
         {
           width: bounds.width.to_mm.round(2),
@@ -278,6 +359,11 @@ module DaumInterior
       def positive_integer(value, fallback)
         integer = value.to_i
         integer.positive? ? integer : fallback
+      end
+
+      def positive_float(value, fallback)
+        float = value.to_f
+        float.positive? ? float : fallback
       end
 
       def length_unit_name(model)

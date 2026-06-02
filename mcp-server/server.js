@@ -48,6 +48,25 @@ const tools = [
       required: ["outputPath"],
       additionalProperties: false
     }
+  },
+  {
+    name: "sketchup_export_current_view",
+    description: "Export the current SketchUp viewport as a PNG without changing the camera.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        outputPath: { type: "string", minLength: 1 },
+        width: { type: "number", minimum: 400 },
+        height: { type: "number", minimum: 400 }
+      },
+      required: ["outputPath"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "sketchup_bounds_debug",
+    description: "List largest visible top-level SketchUp entity bounds for export framing diagnosis.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false }
   }
 ];
 
@@ -113,6 +132,14 @@ async function callTool(name, args) {
       height: args.height || 1200
     });
   }
+  if (name === "sketchup_export_current_view") {
+    return requestBridge("POST", "/export_current_view", {
+      outputPath: args.outputPath,
+      width: args.width || 1600,
+      height: args.height || 1200
+    });
+  }
+  if (name === "sketchup_bounds_debug") return requestBridge("GET", "/bounds_debug");
   throw new Error(`Unknown tool: ${name}`);
 }
 

@@ -60,10 +60,13 @@ Extensions > Daum MCP Bridge > Reload Plugin
 - `sketchup_selection`
 - `sketchup_rename_selection`
 - `sketchup_export_top_view`
+- `sketchup_export_current_view`
+- `sketchup_bounds_debug`
 
 ## Important Notes
 
 - Preserve UTF-8 response handling. Korean model names and file paths must not break.
+- When the user asks to show a "top view", use a practical working-view scale close to the user's current SketchUp composition, not a full model-bounds fit.
 - Current bridge response header must include:
 
 ```text
