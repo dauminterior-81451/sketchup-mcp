@@ -47,7 +47,24 @@ module DaumInterior
         UI.messagebox("Daum MCP Bridge is #{state}.\nURL: http://#{HOST}:#{PORT}")
       end
 
+      def reload_plugin
+        stop_without_message
+        load(__FILE__)
+        start
+      rescue StandardError => e
+        UI.messagebox("Daum MCP Bridge reload failed: #{e.message}")
+      end
+
       private
+
+      def stop_without_message
+        @running = false
+        @server.close if @server && !@server.closed?
+        @server = nil
+        @server_thread = nil
+        UI.stop_timer(@timer_id) if @timer_id
+        @timer_id = nil
+      end
 
       def start_worker
         @server_thread = Thread.new do
@@ -280,6 +297,8 @@ module DaumInterior
       menu.add_item('Start Bridge') { start }
       menu.add_item('Status') { status_message }
       menu.add_item('Stop Bridge') { stop }
+      menu.add_separator
+      menu.add_item('Reload Plugin') { reload_plugin }
       file_loaded(__FILE__)
     end
   end

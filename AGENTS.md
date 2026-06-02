@@ -58,6 +58,7 @@ C:\Users\User\.codex\config.toml
 Extensions > Daum MCP Bridge > Start Bridge
 Extensions > Daum MCP Bridge > Status
 Extensions > Daum MCP Bridge > Stop Bridge
+Extensions > Daum MCP Bridge > Reload Plugin
 ```
 
 ## Development Rules

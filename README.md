@@ -19,6 +19,15 @@ docs/INSTALL.md
 - `sketchup_rename_selection`
 - `sketchup_export_top_view`
 
+## SketchUp menu
+
+```text
+Extensions > Daum MCP Bridge > Start Bridge
+Extensions > Daum MCP Bridge > Status
+Extensions > Daum MCP Bridge > Stop Bridge
+Extensions > Daum MCP Bridge > Reload Plugin
+```
+
 ## Default bridge URL
 
 ```text

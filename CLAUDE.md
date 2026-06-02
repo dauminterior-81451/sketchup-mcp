@@ -49,6 +49,7 @@ C:\Users\User\AppData\Roaming\SketchUp\SketchUp 2023\SketchUp\Plugins\daum_mcp_b
 Extensions > Daum MCP Bridge > Start Bridge
 Extensions > Daum MCP Bridge > Status
 Extensions > Daum MCP Bridge > Stop Bridge
+Extensions > Daum MCP Bridge > Reload Plugin
 ```
 
 ## Available Tools
