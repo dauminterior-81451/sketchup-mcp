@@ -288,6 +288,36 @@ const tools = [
       },
       additionalProperties: false
     }
+  },
+  {
+    name: "sketchup_make_faces_from_selection",
+    description: "Try to create faces from selected CAD/imported edges.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false }
+  },
+  {
+    name: "sketchup_pushpull_selected_faces",
+    description: "Push/pull selected faces by a height in millimeters and optionally group the result.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        heightMm: { type: "number" },
+        group: { type: "boolean" },
+        name: { type: "string" }
+      },
+      required: ["heightMm"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "sketchup_find_open_edges",
+    description: "Find selected edges that likely block face creation because their endpoints are open.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        toleranceMm: { type: "number", minimum: 0.1 }
+      },
+      additionalProperties: false
+    }
   }
 ];
 
@@ -397,6 +427,13 @@ async function callTool(name, args) {
   if (name === "sketchup_apply_material_to_selection") return requestBridge("POST", "/apply_material_to_selection", args);
   if (name === "sketchup_align_selection") return requestBridge("POST", "/align_selection", args);
   if (name === "sketchup_start_work_session") return startWorkSession(args);
+  if (name === "sketchup_make_faces_from_selection") return requestBridge("POST", "/make_faces_from_selection", {});
+  if (name === "sketchup_pushpull_selected_faces") return requestBridge("POST", "/pushpull_selected_faces", args);
+  if (name === "sketchup_find_open_edges") {
+    return requestBridge("POST", "/find_open_edges", {
+      toleranceMm: args.toleranceMm || 3
+    });
+  }
   throw new Error(`Unknown tool: ${name}`);
 }
 

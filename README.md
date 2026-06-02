@@ -40,6 +40,9 @@ docs/INSTALL.md
 - `sketchup_apply_material_to_selection`
 - `sketchup_align_selection`
 - `sketchup_start_work_session`
+- `sketchup_make_faces_from_selection`
+- `sketchup_pushpull_selected_faces`
+- `sketchup_find_open_edges`
 
 ## First automation modes
 
@@ -49,6 +52,7 @@ docs/INSTALL.md
 - Review mode: analyze selected entities and find cleanup targets.
 - Safety mode: backup the model, save working scenes, and log assistant actions.
 - Drafting mode: measure selection, add dimensions, assign tags, apply materials, and align entities.
+- CAD mode: make faces from imported edges, diagnose open edges, and push/pull selected faces.
 
 ## SketchUp menu
 

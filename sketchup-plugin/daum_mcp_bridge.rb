@@ -183,6 +183,9 @@ module DaumInterior
         return create_or_assign_tag(body) if method == 'POST' && path == '/create_or_assign_tag'
         return apply_material_to_selection(body) if method == 'POST' && path == '/apply_material_to_selection'
         return align_selection(body) if method == 'POST' && path == '/align_selection'
+        return make_faces_from_selection if method == 'POST' && path == '/make_faces_from_selection'
+        return pushpull_selected_faces(body) if method == 'POST' && path == '/pushpull_selected_faces'
+        return find_open_edges(body) if method == 'POST' && path == '/find_open_edges'
 
         raise "Unknown endpoint: #{method} #{path}"
       end
@@ -708,6 +711,81 @@ module DaumInterior
         raise
       end
 
+      def make_faces_from_selection
+        model = Sketchup.active_model
+        edges = model.selection.grep(Sketchup::Edge)
+        raise 'No selected edges.' if edges.empty?
+
+        created = 0
+        model.start_operation('Make Faces From Selection', true)
+        before_faces = model.active_entities.grep(Sketchup::Face).length
+        edges.each do |edge|
+          next unless edge.valid?
+
+          edge.find_faces
+        end
+        after_faces = model.active_entities.grep(Sketchup::Face).length
+        created = after_faces - before_faces
+        model.commit_operation
+        log_action('make_faces_from_selection', { selected_edges: edges.length, created_faces: created })
+
+        {
+          selected_edges: edges.length,
+          created_faces: created,
+          open_edges: open_edge_items(edges, 3.mm).first(50)
+        }
+      rescue StandardError
+        Sketchup.active_model.abort_operation
+        raise
+      end
+
+      def pushpull_selected_faces(body)
+        height = required_number(body, 'heightMm').mm
+        should_group = body['group'] == true
+        name = body['name'].to_s.strip
+        name = 'MCP PushPull' if name.empty?
+        model = Sketchup.active_model
+        faces = model.selection.grep(Sketchup::Face)
+        raise 'No selected faces.' if faces.empty?
+
+        model.start_operation('PushPull Selected Faces', true)
+        if should_group
+          group = model.active_entities.add_group
+          faces.each do |face|
+            points = face.outer_loop.vertices.map { |vertex| vertex.position }
+            new_face = group.entities.add_face(points)
+            new_face.reverse! if new_face.normal.samedirection?(face.normal.reverse)
+            new_face.pushpull(height)
+          end
+          group.name = name
+          result = { pushed_faces: faces.length, grouped: true, name: group.name, bounds_mm: bounds_summary(group.bounds) }
+        else
+          faces.each { |face| face.pushpull(height) if face.valid? }
+          result = { pushed_faces: faces.length, grouped: false, height_mm: height.to_mm.round(2) }
+        end
+        model.commit_operation
+        log_action('pushpull_selected_faces', result)
+
+        result
+      rescue StandardError
+        Sketchup.active_model.abort_operation
+        raise
+      end
+
+      def find_open_edges(body)
+        tolerance = positive_float(body['toleranceMm'], 3).mm
+        edges = Sketchup.active_model.selection.grep(Sketchup::Edge)
+        edges = Sketchup.active_model.entities.grep(Sketchup::Edge) if edges.empty?
+        items = open_edge_items(edges, tolerance)
+
+        {
+          checked_edges: edges.length,
+          tolerance_mm: tolerance.to_mm.round(2),
+          open_endpoints: items.length,
+          items: items.first(100)
+        }
+      end
+
       def entity_summary(entity)
         bounds = entity.respond_to?(:bounds) ? entity.bounds : nil
         {
@@ -954,6 +1032,29 @@ module DaumInterior
         return Geom::Vector3d.new(0, delta, 0) if axis == 'y'
 
         Geom::Vector3d.new(0, 0, delta)
+      end
+
+      def open_edge_items(edges, tolerance)
+        endpoints = []
+        edges.each do |edge|
+          endpoints << { edge: edge, point: edge.start.position, vertex: edge.start }
+          endpoints << { edge: edge, point: edge.end.position, vertex: edge.end }
+        end
+
+        endpoints.select do |endpoint|
+          nearby = endpoints.count do |other|
+            next false if other.equal?(endpoint)
+
+            endpoint[:point].distance(other[:point]) <= tolerance
+          end
+          endpoint[:vertex].edges.length <= 1 && nearby.zero?
+        end.map do |endpoint|
+          {
+            edge_length_mm: endpoint[:edge].length.to_mm.round(2),
+            point_mm: point_summary(endpoint[:point]),
+            layer: endpoint[:edge].layer ? endpoint[:edge].layer.name : ''
+          }
+        end
       end
 
       def log_action(action, payload)

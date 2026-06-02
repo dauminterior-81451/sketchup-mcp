@@ -82,6 +82,9 @@ Extensions > Daum MCP Bridge > Reload Plugin
 - `sketchup_apply_material_to_selection`
 - `sketchup_align_selection`
 - `sketchup_start_work_session`
+- `sketchup_make_faces_from_selection`
+- `sketchup_pushpull_selected_faces`
+- `sketchup_find_open_edges`
 
 ## Automation Modes
 
@@ -91,6 +94,7 @@ Extensions > Daum MCP Bridge > Reload Plugin
 - Review mode: analyze selection details, find cleanup targets, and export selected objects for inspection.
 - Safety mode: create `.skp` backups, save working scenes, auto-name selected objects, and log actions.
 - Drafting mode: measure, dimension, tag, materialize, and align selected objects.
+- CAD mode: create faces from imported CAD edges, find open endpoints, and push/pull selected faces.
 
 ## Important Notes
 
@@ -99,6 +103,7 @@ Extensions > Daum MCP Bridge > Reload Plugin
 - Prefer safe, undoable SketchUp operations. Avoid destructive commands unless the user clearly confirms.
 - Before large modeling work, save a scene and create a backup first.
 - Prefer `sketchup_start_work_session` at the beginning of a substantial SketchUp task.
+- CAD conversion should start with selected edges. If no face is created, run open-edge diagnosis before trying more modeling.
 - Current bridge response header must include:
 
 ```text

@@ -73,6 +73,9 @@ C:\Users\User\.codex\config.toml
 - `sketchup_apply_material_to_selection`
 - `sketchup_align_selection`
 - `sketchup_start_work_session`
+- `sketchup_make_faces_from_selection`
+- `sketchup_pushpull_selected_faces`
+- `sketchup_find_open_edges`
 
 ## Current Automation Modes
 
@@ -82,6 +85,7 @@ C:\Users\User\.codex\config.toml
 - Review mode: inspect selected objects, export selected objects, and find cleanup targets before modeling.
 - Safety mode: create backups, save scenes, auto-name selected objects, and log assistant actions.
 - Drafting mode: measure selection, add dimensions, assign tags/materials, and align entities.
+- CAD mode: after DWG/DXF import, create faces from selected edges, diagnose open endpoints, and push/pull selected faces.
 - Avoid destructive modeling commands unless the user explicitly asks and confirms.
 
 ## SketchUp Menu
@@ -106,6 +110,8 @@ Extensions > Daum MCP Bridge > Reload Plugin
 - Do not test modeling commands on the user's active model unless the user asks for that exact change.
 - Before large modeling changes, prefer `sketchup_backup_model` and `sketchup_save_current_view`.
 - For a new work block, prefer `sketchup_start_work_session` before analysis or modeling.
+- CAD face creation depends on clean, closed edges. Run `sketchup_find_open_edges` when face creation fails.
+- Grouped push/pull is intended for simple outer-loop faces first; complex holes may need manual review.
 - Run `npm run check` after editing `mcp-server/server.js`.
 - If editing the Ruby plugin, copy it to the SketchUp Plugins folder and verify through `/ping`, `/status`, and `/model_summary`.
 
