@@ -20,6 +20,9 @@ docs/INSTALL.md
 - `sketchup_export_top_view`
 - `sketchup_export_current_view`
 - `sketchup_bounds_debug`
+- `sketchup_analyze_selection`
+- `sketchup_find_cleanup_targets`
+- `sketchup_export_selection_view`
 - `sketchup_create_box`
 - `sketchup_create_wall`
 - `sketchup_move_selection`
@@ -33,6 +36,7 @@ docs/INSTALL.md
 - View mode: current view, practical top view, bounds diagnosis.
 - Memory mode: capture model summary, selection, and work report to `work-memory/`.
 - Modeling mode: create basic boxes/walls and move/rotate/hide selected objects.
+- Review mode: analyze selected entities and find cleanup targets.
 
 ## SketchUp menu
 

@@ -71,6 +71,38 @@ const tools = [
     inputSchema: { type: "object", properties: {}, additionalProperties: false }
   },
   {
+    name: "sketchup_analyze_selection",
+    description: "Analyze selected SketchUp entities with dimensions, layers, materials, and cleanup hints.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false }
+  },
+  {
+    name: "sketchup_find_cleanup_targets",
+    description: "Find model cleanup targets such as far-away entities, tiny edges, unnamed groups, and hidden entities.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        farDistanceMm: { type: "number", minimum: 1000 },
+        tinyEdgeMm: { type: "number", minimum: 0.1 }
+      },
+      additionalProperties: false
+    }
+  },
+  {
+    name: "sketchup_export_selection_view",
+    description: "Frame current selection from top view and export it as a PNG.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        outputPath: { type: "string", minLength: 1 },
+        width: { type: "number", minimum: 400 },
+        height: { type: "number", minimum: 400 },
+        margin: { type: "number", minimum: 1 }
+      },
+      required: ["outputPath"],
+      additionalProperties: false
+    }
+  },
+  {
     name: "sketchup_create_box",
     description: "Create a named box group in SketchUp using millimeter dimensions.",
     inputSchema: {
@@ -220,6 +252,21 @@ async function callTool(name, args) {
     });
   }
   if (name === "sketchup_bounds_debug") return requestBridge("GET", "/bounds_debug");
+  if (name === "sketchup_analyze_selection") return requestBridge("GET", "/analyze_selection");
+  if (name === "sketchup_find_cleanup_targets") {
+    return requestBridge("POST", "/find_cleanup_targets", {
+      farDistanceMm: args.farDistanceMm || 30000,
+      tinyEdgeMm: args.tinyEdgeMm || 5
+    });
+  }
+  if (name === "sketchup_export_selection_view") {
+    return requestBridge("POST", "/export_selection_view", {
+      outputPath: args.outputPath,
+      width: args.width || 1600,
+      height: args.height || 1200,
+      margin: args.margin || 1.15
+    });
+  }
   if (name === "sketchup_create_box") return requestBridge("POST", "/create_box", args);
   if (name === "sketchup_create_wall") return requestBridge("POST", "/create_wall", args);
   if (name === "sketchup_move_selection") return requestBridge("POST", "/move_selection", args);

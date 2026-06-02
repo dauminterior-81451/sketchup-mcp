@@ -53,6 +53,9 @@ C:\Users\User\.codex\config.toml
 - `sketchup_export_top_view`
 - `sketchup_export_current_view`
 - `sketchup_bounds_debug`
+- `sketchup_analyze_selection`
+- `sketchup_find_cleanup_targets`
+- `sketchup_export_selection_view`
 - `sketchup_create_box`
 - `sketchup_create_wall`
 - `sketchup_move_selection`
@@ -66,6 +69,7 @@ C:\Users\User\.codex\config.toml
 - View mode: export current SketchUp view, export practical top view, debug framing bounds.
 - Memory mode: save model context and latest work report under `work-memory/`.
 - Modeling mode: create basic box/wall groups and move/rotate/hide selected entities.
+- Review mode: inspect selected objects, export selected objects, and find cleanup targets before modeling.
 - Avoid destructive modeling commands unless the user explicitly asks and confirms.
 
 ## SketchUp Menu

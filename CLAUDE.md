@@ -62,6 +62,9 @@ Extensions > Daum MCP Bridge > Reload Plugin
 - `sketchup_export_top_view`
 - `sketchup_export_current_view`
 - `sketchup_bounds_debug`
+- `sketchup_analyze_selection`
+- `sketchup_find_cleanup_targets`
+- `sketchup_export_selection_view`
 - `sketchup_create_box`
 - `sketchup_create_wall`
 - `sketchup_move_selection`
@@ -75,6 +78,7 @@ Extensions > Daum MCP Bridge > Reload Plugin
 - View mode: show current view, practical top view, selection-focused view.
 - Memory mode: save reusable context to `work-memory/model-memory.json` and `work-memory/latest-report.md`.
 - Modeling mode: create simple groups such as boxes and walls; move, rotate, hide, and unhide selected entities.
+- Review mode: analyze selection details, find cleanup targets, and export selected objects for inspection.
 
 ## Important Notes
 

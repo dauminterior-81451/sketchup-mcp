@@ -161,9 +161,12 @@ module DaumInterior
         return model_summary if method == 'GET' && path == '/model_summary'
         return selection_summary if method == 'GET' && path == '/selection'
         return bounds_debug if method == 'GET' && path == '/bounds_debug'
+        return analyze_selection if method == 'GET' && path == '/analyze_selection'
+        return find_cleanup_targets(body) if method == 'POST' && path == '/find_cleanup_targets'
         return rename_selection(body['name'].to_s) if method == 'POST' && path == '/rename_selection'
         return export_top_view(body) if method == 'POST' && path == '/export_top_view'
         return export_current_view(body) if method == 'POST' && path == '/export_current_view'
+        return export_selection_view(body) if method == 'POST' && path == '/export_selection_view'
         return create_box(body) if method == 'POST' && path == '/create_box'
         return create_wall(body) if method == 'POST' && path == '/create_wall'
         return move_selection(body) if method == 'POST' && path == '/move_selection'
@@ -293,6 +296,55 @@ module DaumInterior
           width: width,
           height: height,
           title: Sketchup.active_model.title
+        }
+      end
+
+      def export_selection_view(body)
+        output_path = body['outputPath'].to_s
+        raise 'outputPath is required.' if output_path.strip.empty?
+
+        width = positive_integer(body['width'], 1600)
+        height = positive_integer(body['height'], 1200)
+        margin = positive_float(body['margin'], 1.15)
+        model = Sketchup.active_model
+        selection = model.selection.to_a
+        raise 'No selected entities.' if selection.empty?
+
+        bounds = selection_bounds(selection)
+        view = model.active_view
+        center = bounds.center
+        distance = [bounds.width, bounds.depth, bounds.height, 1000.mm].max * 2
+        image_aspect = width.to_f / height.to_f
+        view_height = [bounds.depth, bounds.width / image_aspect].max * margin
+
+        camera = Sketchup::Camera.new(
+          Geom::Point3d.new(center.x, center.y, center.z + distance),
+          Geom::Point3d.new(center.x, center.y, center.z),
+          Geom::Vector3d.new(0, 1, 0)
+        )
+        camera.perspective = false
+        camera.height = view_height
+        view.camera = camera
+        view.refresh
+
+        FileUtils.mkdir_p(File.dirname(output_path))
+        ok = view.write_image(
+          filename: output_path,
+          width: width,
+          height: height,
+          antialias: true,
+          compression: 0.9,
+          transparent: false
+        )
+        raise "Failed to write image: #{output_path}" unless ok
+
+        {
+          output_path: output_path,
+          width: width,
+          height: height,
+          margin: margin,
+          selection_count: selection.length,
+          bounds_mm: bounds_summary(bounds)
         }
       end
 
@@ -460,7 +512,88 @@ module DaumInterior
           type: entity.typename,
           name: entity.respond_to?(:name) ? entity.name.to_s : '',
           layer: entity.respond_to?(:layer) && entity.layer ? entity.layer.name : '',
+          material: entity.respond_to?(:material) && entity.material ? entity.material.display_name : '',
           bounds_mm: bounds ? bounds_summary(bounds) : nil
+        }
+      end
+
+      def analyze_selection
+        selection = Sketchup.active_model.selection.to_a
+        selection_bounds_value = selection.empty? ? nil : selection_bounds(selection)
+        items = selection.map { |entity| selection_analysis_item(entity) }
+
+        {
+          count: selection.length,
+          combined_bounds_mm: selection_bounds_value ? bounds_summary(selection_bounds_value) : nil,
+          combined_area_m2: items.map { |item| item[:area_m2].to_f }.sum.round(3),
+          items: items,
+          hints: selection_hints(items)
+        }
+      end
+
+      def selection_analysis_item(entity)
+        bounds = entity.respond_to?(:bounds) ? entity.bounds : nil
+        entity_area = area_m2(entity)
+        {
+          type: entity.typename,
+          name: entity.respond_to?(:name) ? entity.name.to_s : '',
+          layer: entity.respond_to?(:layer) && entity.layer ? entity.layer.name : '',
+          material: entity.respond_to?(:material) && entity.material ? entity.material.display_name : '',
+          hidden: entity.respond_to?(:hidden?) ? entity.hidden? : false,
+          bounds_mm: bounds ? bounds_summary(bounds) : nil,
+          center_mm: bounds ? point_summary(bounds.center) : nil,
+          area_m2: entity_area,
+          cleanup_hints: entity_cleanup_hints(entity, bounds)
+        }
+      end
+
+      def find_cleanup_targets(body)
+        far_distance = positive_float(body['farDistanceMm'], 30000)
+        tiny_edge = positive_float(body['tinyEdgeMm'], 5)
+        model = Sketchup.active_model
+        origin = Geom::Point3d.new(0, 0, 0)
+        hidden = []
+        unnamed = []
+        far = []
+        tiny_edges = []
+        tagless = []
+
+        model.entities.each do |entity|
+          hidden << cleanup_item(entity) if entity.respond_to?(:hidden?) && entity.hidden?
+          unnamed << cleanup_item(entity) if unnamed_container?(entity)
+          tagless << cleanup_item(entity) if tagless?(entity)
+
+          if entity.respond_to?(:bounds)
+            distance_mm = entity.bounds.center.distance(origin).to_mm
+            item = cleanup_item(entity)
+            item[:distance_from_origin_mm] = distance_mm.round(2)
+            far << item if distance_mm > far_distance
+          end
+
+          if entity.is_a?(Sketchup::Edge) && entity.length.to_mm < tiny_edge
+            item = cleanup_item(entity)
+            item[:length_mm] = entity.length.to_mm.round(2)
+            tiny_edges << item
+          end
+        end
+
+        {
+          thresholds: {
+            far_distance_mm: far_distance,
+            tiny_edge_mm: tiny_edge
+          },
+          hidden_entities: hidden.first(50),
+          unnamed_groups_or_components: unnamed.first(50),
+          tagless_entities: tagless.first(50),
+          far_entities: far.sort_by { |item| -item[:distance_from_origin_mm] }.first(50),
+          tiny_edges: tiny_edges.first(50),
+          summary: {
+            hidden_entities: hidden.length,
+            unnamed_groups_or_components: unnamed.length,
+            tagless_entities: tagless.length,
+            far_entities: far.length,
+            tiny_edges: tiny_edges.length
+          }
         }
       end
 
@@ -505,6 +638,67 @@ module DaumInterior
         }
       end
 
+      def selection_bounds(selection)
+        bounds = Geom::BoundingBox.new
+        selection.each { |entity| bounds.add(entity.bounds) if entity.respond_to?(:bounds) }
+        raise 'Selected entities have no bounds.' unless bounds.valid?
+
+        bounds
+      end
+
+      def area_m2(entity)
+        total = 0.0
+        if entity.is_a?(Sketchup::Face)
+          total += entity.area
+        elsif entity.respond_to?(:entities)
+          entity.entities.grep(Sketchup::Face).each { |face| total += face.area }
+        elsif entity.respond_to?(:definition) && entity.definition
+          entity.definition.entities.grep(Sketchup::Face).each { |face| total += face.area }
+        end
+        (total * 0.00064516).round(3)
+      end
+
+      def entity_cleanup_hints(entity, bounds)
+        hints = []
+        hints << 'name_missing' if unnamed_container?(entity)
+        hints << 'tag_missing' if tagless?(entity)
+        hints << 'hidden' if entity.respond_to?(:hidden?) && entity.hidden?
+        hints << 'tiny_bounds' if bounds && bounds_diagonal_mm(bounds) < 10
+        hints
+      end
+
+      def selection_hints(items)
+        hints = []
+        hints << 'nothing_selected' if items.empty?
+        hints << 'some_names_missing' if items.any? { |item| item[:cleanup_hints].include?('name_missing') }
+        hints << 'some_tags_missing' if items.any? { |item| item[:cleanup_hints].include?('tag_missing') }
+        hints << 'tiny_entities_selected' if items.any? { |item| item[:cleanup_hints].include?('tiny_bounds') }
+        hints
+      end
+
+      def cleanup_item(entity)
+        bounds = entity.respond_to?(:bounds) ? entity.bounds : nil
+        {
+          type: entity.typename,
+          name: entity.respond_to?(:name) ? entity.name.to_s : '',
+          layer: entity.respond_to?(:layer) && entity.layer ? entity.layer.name : '',
+          bounds_mm: bounds ? bounds_summary(bounds) : nil,
+          center_mm: bounds ? point_summary(bounds.center) : nil
+        }
+      end
+
+      def unnamed_container?(entity)
+        return false unless entity.is_a?(Sketchup::Group) || entity.is_a?(Sketchup::ComponentInstance)
+
+        entity.respond_to?(:name) && entity.name.to_s.strip.empty?
+      end
+
+      def tagless?(entity)
+        return false unless entity.respond_to?(:layer) && entity.layer
+
+        entity.layer.name.to_s == 'Layer0' || entity.layer.name.to_s == 'Untagged'
+      end
+
       def entity_visible?(entity)
         return false if entity.respond_to?(:hidden?) && entity.hidden?
         return false if entity.respond_to?(:layer) && entity.layer && !entity.layer.visible?
@@ -517,6 +711,18 @@ module DaumInterior
           width: bounds.width.to_mm.round(2),
           depth: bounds.depth.to_mm.round(2),
           height: bounds.height.to_mm.round(2)
+        }
+      end
+
+      def bounds_diagonal_mm(bounds)
+        Math.sqrt(bounds.width.to_mm**2 + bounds.depth.to_mm**2 + bounds.height.to_mm**2).round(2)
+      end
+
+      def point_summary(point)
+        {
+          x: point.x.to_mm.round(2),
+          y: point.y.to_mm.round(2),
+          z: point.z.to_mm.round(2)
         }
       end
 
