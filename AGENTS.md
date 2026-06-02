@@ -50,6 +50,7 @@ C:\Users\User\.codex\config.toml
 - `sketchup_model_summary`
 - `sketchup_selection`
 - `sketchup_rename_selection`
+- `sketchup_export_top_view`
 
 ## SketchUp Menu
 

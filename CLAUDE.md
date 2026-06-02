@@ -58,6 +58,7 @@ Extensions > Daum MCP Bridge > Stop Bridge
 - `sketchup_model_summary`
 - `sketchup_selection`
 - `sketchup_rename_selection`
+- `sketchup_export_top_view`
 
 ## Important Notes
 

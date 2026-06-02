@@ -1,5 +1,6 @@
 require 'json'
 require 'socket'
+require 'fileutils'
 require 'sketchup.rb'
 
 module DaumInterior
@@ -81,24 +82,28 @@ module DaumInterior
       end
 
       def handle_client(socket)
-        request = read_request(socket)
-        method = request[:method]
-        path = request[:path]
-        body = request[:body]
+        begin
+          request = read_request(socket)
+          method = request[:method]
+          path = request[:path]
+          body = request[:body]
 
-        job_id = "#{Time.now.to_f}-#{rand(100000)}"
-        @jobs << { id: job_id, method: method, path: path, body: body }
+          job_id = "#{Time.now.to_f}-#{rand(100000)}"
+          @jobs << { id: job_id, method: method, path: path, body: body }
 
-        started_at = Time.now
-        sleep(0.02) until @results.key?(job_id) || Time.now - started_at > 5
-        result = @results.delete(job_id)
+          started_at = Time.now
+          sleep(0.02) until @results.key?(job_id) || Time.now - started_at > 5
+          result = @results.delete(job_id)
 
-        if result.nil?
-          write_response(socket, 504, { error: 'SketchUp bridge job timed out.' })
-        elsif result[:ok]
-          write_response(socket, 200, result[:data])
-        else
-          write_response(socket, 500, { error: result[:error] })
+          if result.nil?
+            write_response(socket, 504, { error: 'SketchUp bridge job timed out.' })
+          elsif result[:ok]
+            write_response(socket, 200, result[:data])
+          else
+            write_response(socket, 500, { error: result[:error] })
+          end
+        rescue StandardError => e
+          write_response(socket, 500, { error: e.message })
         end
       ensure
         socket.close if socket && !socket.closed?
@@ -139,6 +144,7 @@ module DaumInterior
         return model_summary if method == 'GET' && path == '/model_summary'
         return selection_summary if method == 'GET' && path == '/selection'
         return rename_selection(body['name'].to_s) if method == 'POST' && path == '/rename_selection'
+        return export_top_view(body) if method == 'POST' && path == '/export_top_view'
 
         raise "Unknown endpoint: #{method} #{path}"
       end
@@ -193,6 +199,47 @@ module DaumInterior
         { changed: changed, name: name }
       end
 
+      def export_top_view(body)
+        output_path = body['outputPath'].to_s
+        raise 'outputPath is required.' if output_path.strip.empty?
+
+        width = positive_integer(body['width'], 1600)
+        height = positive_integer(body['height'], 1200)
+        model = Sketchup.active_model
+        view = model.active_view
+        bounds = model.bounds
+        center = bounds.center
+        distance = [bounds.width, bounds.depth, bounds.height, 1000.mm].max * 2
+
+        eye = Geom::Point3d.new(center.x, center.y, center.z + distance)
+        target = Geom::Point3d.new(center.x, center.y, center.z)
+        up = Geom::Vector3d.new(0, 1, 0)
+        camera = Sketchup::Camera.new(eye, target, up)
+        camera.perspective = false
+
+        view.camera = camera
+        view.zoom_extents
+        view.refresh
+
+        FileUtils.mkdir_p(File.dirname(output_path))
+        ok = view.write_image(
+          filename: output_path,
+          width: width,
+          height: height,
+          antialias: true,
+          compression: 0.9,
+          transparent: false
+        )
+        raise "Failed to write image: #{output_path}" unless ok
+
+        {
+          output_path: output_path,
+          width: width,
+          height: height,
+          title: model.title
+        }
+      end
+
       def entity_summary(entity)
         bounds = entity.respond_to?(:bounds) ? entity.bounds : nil
         {
@@ -209,6 +256,11 @@ module DaumInterior
           depth: bounds.depth.to_mm.round(2),
           height: bounds.height.to_mm.round(2)
         }
+      end
+
+      def positive_integer(value, fallback)
+        integer = value.to_i
+        integer.positive? ? integer : fallback
       end
 
       def length_unit_name(model)

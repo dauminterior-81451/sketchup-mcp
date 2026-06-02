@@ -17,6 +17,7 @@ docs/INSTALL.md
 - `sketchup_model_summary`
 - `sketchup_selection`
 - `sketchup_rename_selection`
+- `sketchup_export_top_view`
 
 ## Default bridge URL
 

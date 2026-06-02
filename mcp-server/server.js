@@ -34,6 +34,20 @@ const tools = [
       required: ["name"],
       additionalProperties: false
     }
+  },
+  {
+    name: "sketchup_export_top_view",
+    description: "Export the current SketchUp model as a top-view PNG.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        outputPath: { type: "string", minLength: 1 },
+        width: { type: "number", minimum: 400 },
+        height: { type: "number", minimum: 400 }
+      },
+      required: ["outputPath"],
+      additionalProperties: false
+    }
   }
 ];
 
@@ -91,6 +105,13 @@ async function callTool(name, args) {
   if (name === "sketchup_selection") return requestBridge("GET", "/selection");
   if (name === "sketchup_rename_selection") {
     return requestBridge("POST", "/rename_selection", { name: args.name });
+  }
+  if (name === "sketchup_export_top_view") {
+    return requestBridge("POST", "/export_top_view", {
+      outputPath: args.outputPath,
+      width: args.width || 1600,
+      height: args.height || 1200
+    });
   }
   throw new Error(`Unknown tool: ${name}`);
 }
