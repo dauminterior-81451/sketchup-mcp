@@ -124,10 +124,10 @@ module DaumInterior
       end
 
       def write_response(socket, status, payload)
-        body = JSON.generate(payload)
+        body = JSON.generate(payload).encode('UTF-8')
         reason = status == 200 ? 'OK' : 'ERROR'
         socket.write("HTTP/1.1 #{status} #{reason}\r\n")
-        socket.write("Content-Type: application/json\r\n")
+        socket.write("Content-Type: application/json; charset=utf-8\r\n")
         socket.write("Content-Length: #{body.bytesize}\r\n")
         socket.write("Connection: close\r\n\r\n")
         socket.write(body)
