@@ -76,6 +76,12 @@ Extensions > Daum MCP Bridge > Reload Plugin
 - `sketchup_create_scene`
 - `sketchup_auto_name_selection`
 - `sketchup_backup_model`
+- `sketchup_measure_selection`
+- `sketchup_add_dimensions_to_selection`
+- `sketchup_create_or_assign_tag`
+- `sketchup_apply_material_to_selection`
+- `sketchup_align_selection`
+- `sketchup_start_work_session`
 
 ## Automation Modes
 
@@ -84,6 +90,7 @@ Extensions > Daum MCP Bridge > Reload Plugin
 - Modeling mode: create simple groups such as boxes and walls; move, rotate, hide, and unhide selected entities.
 - Review mode: analyze selection details, find cleanup targets, and export selected objects for inspection.
 - Safety mode: create `.skp` backups, save working scenes, auto-name selected objects, and log actions.
+- Drafting mode: measure, dimension, tag, materialize, and align selected objects.
 
 ## Important Notes
 
@@ -91,6 +98,7 @@ Extensions > Daum MCP Bridge > Reload Plugin
 - When the user asks to show a "top view", use a practical working-view scale close to the user's current SketchUp composition, not a full model-bounds fit.
 - Prefer safe, undoable SketchUp operations. Avoid destructive commands unless the user clearly confirms.
 - Before large modeling work, save a scene and create a backup first.
+- Prefer `sketchup_start_work_session` at the beginning of a substantial SketchUp task.
 - Current bridge response header must include:
 
 ```text

@@ -221,6 +221,73 @@ const tools = [
     name: "sketchup_backup_model",
     description: "Save a timestamped backup copy of the current SketchUp model.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false }
+  },
+  {
+    name: "sketchup_measure_selection",
+    description: "Measure selected entities: combined bounds, area, and centers.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false }
+  },
+  {
+    name: "sketchup_add_dimensions_to_selection",
+    description: "Add width, depth, and height dimensions around the current selection.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        offsetMm: { type: "number", minimum: 1 }
+      },
+      additionalProperties: false
+    }
+  },
+  {
+    name: "sketchup_create_or_assign_tag",
+    description: "Create a SketchUp tag/layer if needed and assign selected entities to it.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        tagName: { type: "string", minLength: 1 }
+      },
+      required: ["tagName"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "sketchup_apply_material_to_selection",
+    description: "Create/apply a material to selected entities.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", minLength: 1 },
+        color: { type: "string", minLength: 4 }
+      },
+      required: ["name", "color"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "sketchup_align_selection",
+    description: "Align selected entities to a bounds side or center along one axis.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        axis: { type: "string", enum: ["x", "y", "z"] },
+        mode: { type: "string", enum: ["min", "center", "max"] },
+        valueMm: { type: "number" }
+      },
+      required: ["axis", "mode", "valueMm"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "sketchup_start_work_session",
+    description: "Start a safe work session: backup model, save current scene, capture memory, and export current view.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sceneName: { type: "string" },
+        outputPath: { type: "string" }
+      },
+      additionalProperties: false
+    }
   }
 ];
 
@@ -320,6 +387,16 @@ async function callTool(name, args) {
   if (name === "sketchup_create_scene") return requestBridge("POST", "/create_scene", args);
   if (name === "sketchup_auto_name_selection") return requestBridge("POST", "/auto_name_selection", args);
   if (name === "sketchup_backup_model") return requestBridge("POST", "/backup_model", {});
+  if (name === "sketchup_measure_selection") return requestBridge("GET", "/measure_selection");
+  if (name === "sketchup_add_dimensions_to_selection") {
+    return requestBridge("POST", "/add_dimensions_to_selection", {
+      offsetMm: args.offsetMm || 300
+    });
+  }
+  if (name === "sketchup_create_or_assign_tag") return requestBridge("POST", "/create_or_assign_tag", args);
+  if (name === "sketchup_apply_material_to_selection") return requestBridge("POST", "/apply_material_to_selection", args);
+  if (name === "sketchup_align_selection") return requestBridge("POST", "/align_selection", args);
+  if (name === "sketchup_start_work_session") return startWorkSession(args);
   throw new Error(`Unknown tool: ${name}`);
 }
 
@@ -365,6 +442,27 @@ async function captureWorkContext() {
   fs.writeFileSync(reportPath, report, "utf8");
 
   return { memoryPath, reportPath, capturedAt, modelTitle: model.title };
+}
+
+async function startWorkSession(args) {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const outputPath = args.outputPath || path.join(
+    path.resolve(__dirname, ".."),
+    "work-memory",
+    `current-view-${timestamp}.png`
+  );
+  const sceneName = args.sceneName || `Codex Work ${timestamp}`;
+
+  const backup = await requestBridge("POST", "/backup_model", {});
+  const scene = await requestBridge("POST", "/save_current_view", { name: sceneName });
+  const memory = await captureWorkContext();
+  const view = await requestBridge("POST", "/export_current_view", {
+    outputPath,
+    width: 1600,
+    height: 1200
+  });
+
+  return { backup, scene, memory, view };
 }
 
 function jsonRpc(id, result) {

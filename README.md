@@ -34,6 +34,12 @@ docs/INSTALL.md
 - `sketchup_create_scene`
 - `sketchup_auto_name_selection`
 - `sketchup_backup_model`
+- `sketchup_measure_selection`
+- `sketchup_add_dimensions_to_selection`
+- `sketchup_create_or_assign_tag`
+- `sketchup_apply_material_to_selection`
+- `sketchup_align_selection`
+- `sketchup_start_work_session`
 
 ## First automation modes
 
@@ -42,6 +48,7 @@ docs/INSTALL.md
 - Modeling mode: create basic boxes/walls and move/rotate/hide selected objects.
 - Review mode: analyze selected entities and find cleanup targets.
 - Safety mode: backup the model, save working scenes, and log assistant actions.
+- Drafting mode: measure selection, add dimensions, assign tags, apply materials, and align entities.
 
 ## SketchUp menu
 

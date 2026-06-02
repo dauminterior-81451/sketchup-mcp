@@ -178,6 +178,11 @@ module DaumInterior
         return create_scene(body) if method == 'POST' && path == '/create_scene'
         return auto_name_selection(body) if method == 'POST' && path == '/auto_name_selection'
         return backup_model if method == 'POST' && path == '/backup_model'
+        return measure_selection if method == 'GET' && path == '/measure_selection'
+        return add_dimensions_to_selection(body) if method == 'POST' && path == '/add_dimensions_to_selection'
+        return create_or_assign_tag(body) if method == 'POST' && path == '/create_or_assign_tag'
+        return apply_material_to_selection(body) if method == 'POST' && path == '/apply_material_to_selection'
+        return align_selection(body) if method == 'POST' && path == '/align_selection'
 
         raise "Unknown endpoint: #{method} #{path}"
       end
@@ -583,6 +588,126 @@ module DaumInterior
         }
       end
 
+      def measure_selection
+        analyze_selection
+      end
+
+      def add_dimensions_to_selection(body)
+        offset = positive_float(body['offsetMm'], 300).mm
+        model = Sketchup.active_model
+        selection = model.selection.to_a
+        raise 'No selected entities.' if selection.empty?
+
+        bounds = selection_bounds(selection)
+        model.start_operation('Add Selection Dimensions', true)
+        entities = model.active_entities
+        created = 0
+
+        x1 = Geom::Point3d.new(bounds.min.x, bounds.min.y - offset, bounds.min.z)
+        x2 = Geom::Point3d.new(bounds.max.x, bounds.min.y - offset, bounds.min.z)
+        entities.add_dimension_linear(x1, x2, Geom::Vector3d.new(0, -offset, 0))
+        created += 1
+
+        y1 = Geom::Point3d.new(bounds.max.x + offset, bounds.min.y, bounds.min.z)
+        y2 = Geom::Point3d.new(bounds.max.x + offset, bounds.max.y, bounds.min.z)
+        entities.add_dimension_linear(y1, y2, Geom::Vector3d.new(offset, 0, 0))
+        created += 1
+
+        if bounds.height > 0
+          z1 = Geom::Point3d.new(bounds.max.x + offset, bounds.max.y + offset, bounds.min.z)
+          z2 = Geom::Point3d.new(bounds.max.x + offset, bounds.max.y + offset, bounds.max.z)
+          entities.add_dimension_linear(z1, z2, Geom::Vector3d.new(offset, offset, 0))
+          created += 1
+        end
+
+        model.commit_operation
+        log_action('add_dimensions_to_selection', { count: created, offset_mm: offset.to_mm.round(2) })
+
+        { created: created, bounds_mm: bounds_summary(bounds) }
+      rescue StandardError
+        Sketchup.active_model.abort_operation
+        raise
+      end
+
+      def create_or_assign_tag(body)
+        tag_name = body['tagName'].to_s.strip
+        raise 'tagName is required.' if tag_name.empty?
+
+        model = Sketchup.active_model
+        layer = model.layers[tag_name] || model.layers.add(tag_name)
+        selection = model.selection.to_a
+        raise 'No selected entities.' if selection.empty?
+
+        model.start_operation("Assign Tag #{tag_name}", true)
+        selection.each { |entity| entity.layer = layer if entity.respond_to?(:layer=) }
+        model.commit_operation
+        log_action('create_or_assign_tag', { tag_name: tag_name, count: selection.length })
+
+        { assigned: selection.length, tag_name: tag_name }
+      rescue StandardError
+        Sketchup.active_model.abort_operation
+        raise
+      end
+
+      def apply_material_to_selection(body)
+        name = body['name'].to_s.strip
+        color = body['color'].to_s.strip
+        raise 'name is required.' if name.empty?
+        raise 'color is required.' if color.empty?
+
+        model = Sketchup.active_model
+        selection = model.selection.to_a
+        raise 'No selected entities.' if selection.empty?
+
+        material = model.materials[name] || model.materials.add(name)
+        material.color = parse_color(color)
+
+        model.start_operation("Apply Material #{name}", true)
+        selection.each do |entity|
+          entity.material = material if entity.respond_to?(:material=)
+        end
+        model.commit_operation
+        log_action('apply_material_to_selection', { name: name, color: color, count: selection.length })
+
+        { applied: selection.length, material: name, color: color }
+      rescue StandardError
+        Sketchup.active_model.abort_operation
+        raise
+      end
+
+      def align_selection(body)
+        axis = body['axis'].to_s.downcase
+        mode = body['mode'].to_s.downcase
+        value = required_number(body, 'valueMm').mm
+        axis_index = { 'x' => 0, 'y' => 1, 'z' => 2 }[axis]
+        raise 'axis must be x, y, or z.' if axis_index.nil?
+        raise 'mode must be min, center, or max.' unless %w[min center max].include?(mode)
+
+        model = Sketchup.active_model
+        selection = model.selection.to_a
+        raise 'No selected entities.' if selection.empty?
+
+        model.start_operation('Align Selection', true)
+        moved = 0
+        selection.each do |entity|
+          next unless entity.respond_to?(:bounds)
+
+          current = bounds_axis_value(entity.bounds, axis, mode)
+          delta = value - current
+          vector = axis_vector(axis, delta)
+          transform = Geom::Transformation.translation(vector)
+          model.active_entities.transform_entities(transform, [entity])
+          moved += 1
+        end
+        model.commit_operation
+        log_action('align_selection', { axis: axis, mode: mode, value_mm: value.to_mm.round(2), moved: moved })
+
+        { moved: moved, axis: axis, mode: mode, value_mm: value.to_mm.round(2) }
+      rescue StandardError
+        Sketchup.active_model.abort_operation
+        raise
+      end
+
       def entity_summary(entity)
         bounds = entity.respond_to?(:bounds) ? entity.bounds : nil
         {
@@ -801,6 +926,34 @@ module DaumInterior
           y: point.y.to_mm.round(2),
           z: point.z.to_mm.round(2)
         }
+      end
+
+      def parse_color(value)
+        hex = value.start_with?('#') ? value[1..] : value
+        raise 'color must be #RRGGBB.' unless hex && hex.match?(/\A[0-9a-fA-F]{6}\z/)
+
+        Sketchup::Color.new(hex[0..1].to_i(16), hex[2..3].to_i(16), hex[4..5].to_i(16))
+      end
+
+      def bounds_axis_value(bounds, axis, mode)
+        case [axis, mode]
+        when ['x', 'min'] then bounds.min.x
+        when ['x', 'center'] then bounds.center.x
+        when ['x', 'max'] then bounds.max.x
+        when ['y', 'min'] then bounds.min.y
+        when ['y', 'center'] then bounds.center.y
+        when ['y', 'max'] then bounds.max.y
+        when ['z', 'min'] then bounds.min.z
+        when ['z', 'center'] then bounds.center.z
+        when ['z', 'max'] then bounds.max.z
+        end
+      end
+
+      def axis_vector(axis, delta)
+        return Geom::Vector3d.new(delta, 0, 0) if axis == 'x'
+        return Geom::Vector3d.new(0, delta, 0) if axis == 'y'
+
+        Geom::Vector3d.new(0, 0, delta)
       end
 
       def log_action(action, payload)

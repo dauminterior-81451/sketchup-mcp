@@ -67,6 +67,12 @@ C:\Users\User\.codex\config.toml
 - `sketchup_create_scene`
 - `sketchup_auto_name_selection`
 - `sketchup_backup_model`
+- `sketchup_measure_selection`
+- `sketchup_add_dimensions_to_selection`
+- `sketchup_create_or_assign_tag`
+- `sketchup_apply_material_to_selection`
+- `sketchup_align_selection`
+- `sketchup_start_work_session`
 
 ## Current Automation Modes
 
@@ -75,6 +81,7 @@ C:\Users\User\.codex\config.toml
 - Modeling mode: create basic box/wall groups and move/rotate/hide selected entities.
 - Review mode: inspect selected objects, export selected objects, and find cleanup targets before modeling.
 - Safety mode: create backups, save scenes, auto-name selected objects, and log assistant actions.
+- Drafting mode: measure selection, add dimensions, assign tags/materials, and align entities.
 - Avoid destructive modeling commands unless the user explicitly asks and confirms.
 
 ## SketchUp Menu
@@ -98,6 +105,7 @@ Extensions > Daum MCP Bridge > Reload Plugin
 - When adding modeling automation, prefer safe reversible operations using `model.start_operation`.
 - Do not test modeling commands on the user's active model unless the user asks for that exact change.
 - Before large modeling changes, prefer `sketchup_backup_model` and `sketchup_save_current_view`.
+- For a new work block, prefer `sketchup_start_work_session` before analysis or modeling.
 - Run `npm run check` after editing `mcp-server/server.js`.
 - If editing the Ruby plugin, copy it to the SketchUp Plugins folder and verify through `/ping`, `/status`, and `/model_summary`.
 
