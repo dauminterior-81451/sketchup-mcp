@@ -100,6 +100,9 @@ Extensions > Daum MCP Bridge > Reload Plugin
 ## Development Rules
 
 - Keep changes small and practical.
+- Use token-saving mode: avoid long explanations, avoid full-file dumps, report only progress/result/changed files/checks/commit.
+- Prefer `rg`, `git diff --stat`, and targeted reads over full file reads.
+- When proposing next work, list only 2-3 options and one recommendation.
 - Do not start furniture drawing automation unless explicitly requested.
 - Do not change ports or MCP names without updating docs and config instructions.
 - Do not hardcode user project model paths.

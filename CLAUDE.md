@@ -13,6 +13,7 @@ It is not yet the furniture drawing automation project.
 - State conclusion first.
 - Use exact file paths, commands, and results.
 - Avoid broad refactors.
+- Use token-saving mode: no long dumps, no repeated summaries, and report only the key result unless detail is requested.
 
 ## Architecture
 
