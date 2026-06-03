@@ -96,6 +96,28 @@ const tools = [
     }
   },
   {
+    name: "sketchup_create_window_frame",
+    description: "Create a simple window frame group from center, width, height, sill height, and frame thickness in millimeters.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        centerX: { type: "number" },
+        centerY: { type: "number" },
+        width: { type: "number", minimum: 1 },
+        height: { type: "number", minimum: 1 },
+        sillHeight: { type: "number" },
+        topOffset: { type: "number" },
+        bottomOffset: { type: "number" },
+        wallHeight: { type: "number" },
+        frameThickness: { type: "number", minimum: 1 },
+        depth: { type: "number", minimum: 1 }
+      },
+      required: ["centerX", "centerY", "width", "height"],
+      additionalProperties: false
+    }
+  },
+  {
     name: "sketchup_analyze_selection",
     description: "Analyze selected SketchUp entities with dimensions, layers, materials, and cleanup hints.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false }
@@ -428,6 +450,7 @@ async function callTool(name, args) {
       minWidthMm: args.minWidthMm || 600
     });
   }
+  if (name === "sketchup_create_window_frame") return requestBridge("POST", "/create_window_frame", args);
   if (name === "sketchup_analyze_selection") return requestBridge("GET", "/analyze_selection");
   if (name === "sketchup_find_cleanup_targets") {
     return requestBridge("POST", "/find_cleanup_targets", {

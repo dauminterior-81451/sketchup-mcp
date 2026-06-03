@@ -164,6 +164,7 @@ module DaumInterior
         return bounds_debug if method == 'GET' && path == '/bounds_debug'
         return find_entities_by_tag(body) if method == 'POST' && path == '/find_entities_by_tag'
         return cluster_window_candidates(body) if method == 'POST' && path == '/cluster_window_candidates'
+        return create_window_frame(body) if method == 'POST' && path == '/create_window_frame'
         return analyze_selection if method == 'GET' && path == '/analyze_selection'
         return find_cleanup_targets(body) if method == 'POST' && path == '/find_cleanup_targets'
         return rename_selection(body['name'].to_s) if method == 'POST' && path == '/rename_selection'
@@ -1052,6 +1053,79 @@ module DaumInterior
           center_mm: point_summary(bounds.center),
           bounds_mm: bounds_summary(bounds)
         }
+      end
+
+      def create_window_frame(body)
+        name = body['name'].to_s.strip
+        name = 'Window_Frame' if name.empty?
+        center_x = required_number(body, 'centerX').mm
+        center_z = required_number(body, 'centerY').mm
+        width = required_mm(body, 'width')
+        wall_height = positive_float(body['wallHeight'], 2300).mm
+        bottom = body.key?('bottomOffset') ? positive_float(body['bottomOffset'], 150).mm : number_or_default(body, 'sillHeight', 900).mm
+        top = body.key?('topOffset') ? wall_height - positive_float(body['topOffset'], 100).mm : bottom + required_mm(body, 'height')
+        height = top - bottom
+        raise 'Window height must be greater than 0.' unless height.positive?
+        thickness = positive_float(body['frameThickness'], 60).mm
+        depth = positive_float(body['depth'], 120).mm
+
+        model = Sketchup.active_model
+        model.start_operation("Create #{name}", true)
+        group = model.active_entities.add_group
+        group.name = name
+        group.layer = model.layers['Windows'] || model.layers.add('Windows')
+        material = model.materials['Window_Frame_Gray'] || model.materials.add('Window_Frame_Gray')
+        material.color = Sketchup::Color.new(90, 95, 100)
+
+        left = center_x - width / 2.0
+        right = center_x + width / 2.0
+        z = center_z
+
+        create_bar_y_height(group.entities, 'left', left, bottom, z, thickness, height, depth, material)
+        create_bar_y_height(group.entities, 'right', right - thickness, bottom, z, thickness, height, depth, material)
+        create_bar_y_height(group.entities, 'bottom', left, bottom, z, width, thickness, depth, material)
+        create_bar_y_height(group.entities, 'top', left, top - thickness, z, width, thickness, depth, material)
+        create_bar_y_height(group.entities, 'middle', center_x - thickness / 2.0, bottom, z, thickness, height, depth, material)
+
+        model.commit_operation
+        log_action('create_window_frame', { name: name, width_mm: width.to_mm.round(2), bottom_mm: bottom.to_mm.round(2), top_mm: top.to_mm.round(2), center_x_mm: center_x.to_mm.round(2), center_z_mm: center_z.to_mm.round(2) })
+
+        { created: true, name: group.name, bounds_mm: bounds_summary(group.bounds) }
+      rescue StandardError
+        Sketchup.active_model.abort_operation
+        raise
+      end
+
+      def create_bar_y_height(entities, name, x, y, z, width, height, depth, material)
+        group = entities.add_group
+        group.name = name
+        points = [
+          Geom::Point3d.new(x, y, z - depth / 2.0),
+          Geom::Point3d.new(x + width, y, z - depth / 2.0),
+          Geom::Point3d.new(x + width, y, z + depth / 2.0),
+          Geom::Point3d.new(x, y, z + depth / 2.0)
+        ]
+        face = group.entities.add_face(points)
+        face.reverse! if face.normal.y < 0
+        face.pushpull(height)
+        group.material = material
+        group
+      end
+
+      def create_bar(entities, name, x, y, z, width, depth, height, material)
+        group = entities.add_group
+        group.name = name
+        points = [
+          Geom::Point3d.new(x, y - depth / 2.0, z),
+          Geom::Point3d.new(x + width, y - depth / 2.0, z),
+          Geom::Point3d.new(x + width, y + depth / 2.0, z),
+          Geom::Point3d.new(x, y + depth / 2.0, z)
+        ]
+        face = group.entities.add_face(points)
+        face.reverse! if face.normal.z < 0
+        face.pushpull(height)
+        group.material = material
+        group
       end
 
       def selection_bounds(selection)

@@ -6,6 +6,10 @@ This is a local MCP bridge for helping with manual SketchUp 2023 English desktop
 
 It is not yet the furniture drawing automation project.
 
+Assistant identity: `다움 스케치업 코파일럿`.
+
+Role: learn the owner's SketchUp modeling standards from samples, give concise feedback, and support CAD/SketchUp automation.
+
 ## User Preference
 
 - Answer in Korean.
@@ -65,6 +69,7 @@ Extensions > Daum MCP Bridge > Reload Plugin
 - `sketchup_bounds_debug`
 - `sketchup_find_entities_by_tag`
 - `sketchup_cluster_window_candidates`
+- `sketchup_create_window_frame`
 - `sketchup_analyze_selection`
 - `sketchup_find_cleanup_targets`
 - `sketchup_export_selection_view`
