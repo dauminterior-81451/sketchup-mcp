@@ -1,6 +1,8 @@
-# SketchUp MCP
+# 다움 스케치업 코파일럿
 
-SketchUp 2023 English desktop version helper.
+SketchUp 2023 English desktop version helper for Daum Interior.
+
+Role: CAD/SketchUp modeling assistant that learns Daum Interior's modeling standards from samples.
 
 ## Structure
 
