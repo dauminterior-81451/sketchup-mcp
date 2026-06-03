@@ -54,6 +54,7 @@ C:\Users\User\.codex\config.toml
 - `sketchup_export_current_view`
 - `sketchup_bounds_debug`
 - `sketchup_find_entities_by_tag`
+- `sketchup_cluster_window_candidates`
 - `sketchup_analyze_selection`
 - `sketchup_find_cleanup_targets`
 - `sketchup_export_selection_view`

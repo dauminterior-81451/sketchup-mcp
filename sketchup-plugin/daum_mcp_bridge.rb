@@ -163,6 +163,7 @@ module DaumInterior
         return selection_summary if method == 'GET' && path == '/selection'
         return bounds_debug if method == 'GET' && path == '/bounds_debug'
         return find_entities_by_tag(body) if method == 'POST' && path == '/find_entities_by_tag'
+        return cluster_window_candidates(body) if method == 'POST' && path == '/cluster_window_candidates'
         return analyze_selection if method == 'GET' && path == '/analyze_selection'
         return find_cleanup_targets(body) if method == 'POST' && path == '/find_cleanup_targets'
         return rename_selection(body['name'].to_s) if method == 'POST' && path == '/rename_selection'
@@ -979,6 +980,78 @@ module DaumInterior
         transformed = Geom::BoundingBox.new
         8.times { |index| transformed.add(bounds.corner(index).transform(transform)) }
         transformed
+      end
+
+      def cluster_window_candidates(body)
+        cluster_distance = positive_float(body['clusterDistanceMm'], 700)
+        min_width = positive_float(body['minWidthMm'], 600)
+        edges = []
+        collect_tagged_edges(
+          Sketchup.active_model.entities,
+          Geom::Transformation.new,
+          'WINDOW',
+          edges
+        )
+        clusters = build_edge_clusters(edges, cluster_distance.mm)
+        candidates = clusters.map { |cluster| window_candidate_item(cluster) }
+          .select { |item| item[:width_mm] >= min_width }
+          .sort_by { |item| [-item[:width_mm], item[:center_mm][:x], item[:center_mm][:y]] }
+
+        {
+          source_edges: edges.length,
+          cluster_distance_mm: cluster_distance,
+          min_width_mm: min_width,
+          candidates_count: candidates.length,
+          candidates: candidates
+        }
+      end
+
+      def collect_tagged_edges(entities, transform, tag_name, edges)
+        entities.each do |entity|
+          entity_layer = entity.respond_to?(:layer) && entity.layer ? entity.layer.name.to_s : ''
+          if entity.is_a?(Sketchup::Edge) && entity_layer.casecmp(tag_name).zero?
+            edges << { edge: entity, bounds: transformed_bounds(entity.bounds, transform) }
+          end
+
+          if entity.is_a?(Sketchup::Group)
+            collect_tagged_edges(entity.entities, transform * entity.transformation, tag_name, edges)
+          elsif entity.is_a?(Sketchup::ComponentInstance)
+            collect_tagged_edges(entity.definition.entities, transform * entity.transformation, tag_name, edges)
+          end
+        end
+      end
+
+      def build_edge_clusters(edges, distance)
+        clusters = []
+        edges.each do |edge_item|
+          center = edge_item[:bounds].center
+          cluster = clusters.find do |candidate|
+            candidate[:bounds].center.distance(center) <= distance
+          end
+
+          unless cluster
+            cluster = { edges: [], bounds: Geom::BoundingBox.new }
+            clusters << cluster
+          end
+
+          cluster[:edges] << edge_item
+          cluster[:bounds].add(edge_item[:bounds])
+        end
+        clusters
+      end
+
+      def window_candidate_item(cluster)
+        bounds = cluster[:bounds]
+        width = [bounds.width.to_mm, bounds.height.to_mm].max.round(2)
+        direction = bounds.width >= bounds.height ? 'x' : 'y'
+        {
+          edge_count: cluster[:edges].length,
+          width_mm: width,
+          depth_mm: [bounds.width.to_mm, bounds.height.to_mm].min.round(2),
+          direction: direction,
+          center_mm: point_summary(bounds.center),
+          bounds_mm: bounds_summary(bounds)
+        }
       end
 
       def selection_bounds(selection)

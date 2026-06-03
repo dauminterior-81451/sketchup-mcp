@@ -84,6 +84,18 @@ const tools = [
     }
   },
   {
+    name: "sketchup_cluster_window_candidates",
+    description: "Cluster WINDOW tag edges into practical window candidates.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        clusterDistanceMm: { type: "number", minimum: 100 },
+        minWidthMm: { type: "number", minimum: 100 }
+      },
+      additionalProperties: false
+    }
+  },
+  {
     name: "sketchup_analyze_selection",
     description: "Analyze selected SketchUp entities with dimensions, layers, materials, and cleanup hints.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false }
@@ -408,6 +420,12 @@ async function callTool(name, args) {
     return requestBridge("POST", "/find_entities_by_tag", {
       tagName: args.tagName,
       maxItems: args.maxItems || 100
+    });
+  }
+  if (name === "sketchup_cluster_window_candidates") {
+    return requestBridge("POST", "/cluster_window_candidates", {
+      clusterDistanceMm: args.clusterDistanceMm || 700,
+      minWidthMm: args.minWidthMm || 600
     });
   }
   if (name === "sketchup_analyze_selection") return requestBridge("GET", "/analyze_selection");
