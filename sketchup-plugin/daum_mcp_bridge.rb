@@ -162,6 +162,7 @@ module DaumInterior
         return model_summary if method == 'GET' && path == '/model_summary'
         return selection_summary if method == 'GET' && path == '/selection'
         return bounds_debug if method == 'GET' && path == '/bounds_debug'
+        return find_entities_by_tag(body) if method == 'POST' && path == '/find_entities_by_tag'
         return analyze_selection if method == 'GET' && path == '/analyze_selection'
         return find_cleanup_targets(body) if method == 'POST' && path == '/find_cleanup_targets'
         return rename_selection(body['name'].to_s) if method == 'POST' && path == '/rename_selection'
@@ -716,22 +717,26 @@ module DaumInterior
         edges = model.selection.grep(Sketchup::Edge)
         raise 'No selected edges.' if edges.empty?
 
-        created = 0
         model.start_operation('Make Faces From Selection', true)
-        before_faces = model.active_entities.grep(Sketchup::Face).length
+        before_faces = model.active_entities.grep(Sketchup::Face)
         edges.each do |edge|
           next unless edge.valid?
 
           edge.find_faces
         end
-        after_faces = model.active_entities.grep(Sketchup::Face).length
-        created = after_faces - before_faces
+        after_faces = model.active_entities.grep(Sketchup::Face)
+        created_faces = after_faces - before_faces
+        model.selection.clear
+        faces_to_select = created_faces
+        faces_to_select = edges.flat_map(&:faces).uniq if faces_to_select.empty?
+        faces_to_select.each { |face| model.selection.add(face) }
         model.commit_operation
-        log_action('make_faces_from_selection', { selected_edges: edges.length, created_faces: created })
+        log_action('make_faces_from_selection', { selected_edges: edges.length, created_faces: created_faces.length, selected_faces: faces_to_select.length })
 
         {
           selected_edges: edges.length,
-          created_faces: created,
+          created_faces: created_faces.length,
+          selected_faces: faces_to_select.length,
           open_edges: open_edge_items(edges, 3.mm).first(50)
         }
       rescue StandardError
@@ -916,6 +921,64 @@ module DaumInterior
           },
           diagonal_mm: Math.sqrt(bounds.width.to_mm**2 + bounds.depth.to_mm**2 + bounds.height.to_mm**2).round(2)
         }
+      end
+
+      def find_entities_by_tag(body)
+        tag_name = body['tagName'].to_s.strip
+        raise 'tagName is required.' if tag_name.empty?
+
+        max_items = positive_integer(body['maxItems'], 100)
+        matches = []
+        collect_entities_by_tag(
+          Sketchup.active_model.entities,
+          Geom::Transformation.new,
+          [],
+          tag_name,
+          matches,
+          max_items
+        )
+
+        {
+          tag_name: tag_name,
+          count: matches.length,
+          items: matches
+        }
+      end
+
+      def collect_entities_by_tag(entities, transform, path, tag_name, matches, max_items)
+        entities.each do |entity|
+          break if matches.length >= max_items
+
+          entity_layer = entity.respond_to?(:layer) && entity.layer ? entity.layer.name.to_s : ''
+          current_path = path + [entity.typename]
+          if entity_layer.casecmp(tag_name).zero?
+            matches << tagged_entity_item(entity, transform, current_path)
+          end
+
+          if entity.is_a?(Sketchup::Group)
+            collect_entities_by_tag(entity.entities, transform * entity.transformation, current_path, tag_name, matches, max_items)
+          elsif entity.is_a?(Sketchup::ComponentInstance)
+            collect_entities_by_tag(entity.definition.entities, transform * entity.transformation, current_path, tag_name, matches, max_items)
+          end
+        end
+      end
+
+      def tagged_entity_item(entity, transform, path)
+        bounds = transformed_bounds(entity.bounds, transform) if entity.respond_to?(:bounds)
+        {
+          type: entity.typename,
+          name: entity.respond_to?(:name) ? entity.name.to_s : '',
+          layer: entity.respond_to?(:layer) && entity.layer ? entity.layer.name : '',
+          path: path.join(' > '),
+          bounds_mm: bounds ? bounds_summary(bounds) : nil,
+          center_mm: bounds ? point_summary(bounds.center) : nil
+        }
+      end
+
+      def transformed_bounds(bounds, transform)
+        transformed = Geom::BoundingBox.new
+        8.times { |index| transformed.add(bounds.corner(index).transform(transform)) }
+        transformed
       end
 
       def selection_bounds(selection)

@@ -71,6 +71,19 @@ const tools = [
     inputSchema: { type: "object", properties: {}, additionalProperties: false }
   },
   {
+    name: "sketchup_find_entities_by_tag",
+    description: "Find entities by tag/layer name, including inside groups and components.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        tagName: { type: "string", minLength: 1 },
+        maxItems: { type: "number", minimum: 1 }
+      },
+      required: ["tagName"],
+      additionalProperties: false
+    }
+  },
+  {
     name: "sketchup_analyze_selection",
     description: "Analyze selected SketchUp entities with dimensions, layers, materials, and cleanup hints.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false }
@@ -391,6 +404,12 @@ async function callTool(name, args) {
     });
   }
   if (name === "sketchup_bounds_debug") return requestBridge("GET", "/bounds_debug");
+  if (name === "sketchup_find_entities_by_tag") {
+    return requestBridge("POST", "/find_entities_by_tag", {
+      tagName: args.tagName,
+      maxItems: args.maxItems || 100
+    });
+  }
   if (name === "sketchup_analyze_selection") return requestBridge("GET", "/analyze_selection");
   if (name === "sketchup_find_cleanup_targets") {
     return requestBridge("POST", "/find_cleanup_targets", {
